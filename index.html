@@ -8,12 +8,21 @@
 <style>
   :root { --ink:#1a1a1a; --muted:#5c5c5c; --line:#e6e2d9; --bg:#f7f4ee; --card:#fff; --blue:#1f4e79; --red:#b13228; --green:#2e7d4f; --amber:#b56a12; }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  html, body { margin:0; height:100%; width:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); overflow:hidden; overscroll-behavior:none; position:fixed; inset:0; touch-action:manipulation; }
   #map { position:fixed; inset:0 0 42% 0; }
-  #sheet { position:fixed; left:0; right:0; bottom:0; height:42%; background:var(--card); border-top:1px solid var(--line); overflow:auto; -webkit-overflow-scrolling:touch; padding:12px 16px calc(16px + env(safe-area-inset-bottom)); }
+  #map.full { inset:0 0 52px 0; }
+  #sheet { position:fixed; left:0; right:0; bottom:0; height:42%; background:var(--card); border-top:1px solid var(--line); overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none; padding:12px 16px calc(16px + env(safe-area-inset-bottom)); }
+  #sheet.collapsed { height:52px; overflow:hidden; padding:8px 16px calc(8px + env(safe-area-inset-bottom)); }
+  #sheet.collapsed .sheet-body { display:none; }
+  .handle { width:36px; height:4px; background:#ccc; border-radius:2px; margin:0 auto 8px; }
+  .grab { touch-action:none; padding:8px 0 4px; margin:-8px 0 0; }
+  .peek { display:none; font-size:12px; color:var(--muted); text-align:center; }
+  #sheet.collapsed .peek { display:block; }
   @media (min-width: 900px) {
-    #map { right: 380px; inset:0 380px 0 0; }
-    #sheet { top:0; left:auto; width:380px; height:100%; border-top:none; border-left:1px solid var(--line); }
+    #map, #map.full { right: 380px; inset:0 380px 0 0; }
+    #sheet, #sheet.collapsed { top:0; left:auto; width:380px; height:100%; border-top:none; border-left:1px solid var(--line); padding:12px 16px; overflow:auto; }
+    #sheet.collapsed .sheet-body { display:block; }
+    .handle, .peek, .grab { display:none; }
   }
   h1 { font-size:16px; margin:0 0 4px; }
   .sub { font-size:12px; color:var(--muted); margin:0 0 12px; }
@@ -35,8 +44,6 @@
   .sources a { display:block; margin:2px 0; }
   .legend { font-size:11px; color:var(--muted); margin-bottom:10px; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
-  .handle { width:36px; height:4px; background:#ccc; border-radius:2px; margin:0 auto 8px; }
-  @media (min-width: 900px) { .handle { display:none; } }
 </style>
 </head>
 <body>
@@ -49,21 +56,32 @@
   </form>
 </div>
 <script>
+var PWKEY = 'ro-dc-map-ok';
+function openMap(){
+  var g = document.getElementById('gate');
+  if (g) g.remove();
+  setTimeout(function(){ try { map.invalidateSize(); } catch (x) {} }, 50);
+}
 function unlock(e){
   e.preventDefault();
   if (document.getElementById('pw').value === 'n7kQ-2mPx') {
-    document.getElementById('gate').remove();
-    setTimeout(function(){ try { map.invalidateSize(); } catch (x) {} }, 50);
+    try { localStorage.setItem(PWKEY, '1'); } catch (x) {}
+    openMap();
   } else {
     document.getElementById('pwerr').style.display='block';
   }
   return false;
 }
+try { if (localStorage.getItem(PWKEY) === '1') {
+  document.getElementById('gate').style.display = 'none';
+  document.addEventListener('DOMContentLoaded', openMap);
+}} catch (x) {}
 </script>
 
 <div id="map"></div>
 <div id="sheet">
-  <div class="handle"></div>
+  <div class="grab"><div class="handle"></div><div class="peek">Map — pull up for list</div></div>
+  <div class="sheet-body">
   <h1>Romania power + DC map</h1>
   <p class="sub">Tap a pin. 400 kV = fatter pipe (1–2 year path). Positions of stations are town-level, not fence-level.</p>
   <div class="legend">
@@ -79,7 +97,7 @@ function unlock(e){
   </div>
   <div id="detail"></div>
   <div id="list"></div>
-</div>
+</div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const ST400 = [
@@ -326,6 +344,51 @@ document.querySelectorAll(".filters button").forEach(b => {
     });
   };
 });
+
+(function(){
+  const sheet = document.getElementById("sheet");
+  const mapEl = document.getElementById("map");
+  const grab = sheet.querySelector(".grab");
+  if (!grab) return;
+  function isDesktop(){ return window.matchMedia("(min-width: 900px)").matches; }
+  function size(){ setTimeout(function(){ try { map.invalidateSize(); } catch (x) {} }, 60); }
+  function collapse(){
+    if (isDesktop()) return;
+    sheet.classList.add("collapsed");
+    mapEl.classList.add("full");
+    size();
+  }
+  function expand(){
+    sheet.classList.remove("collapsed");
+    mapEl.classList.remove("full");
+    size();
+  }
+  grab.addEventListener("click", function(){
+    if (sheet.classList.contains("collapsed")) expand(); else collapse();
+  });
+  let y0 = 0, drag = false;
+  function onStart(y){ y0 = y; drag = true; }
+  function onMove(y, ev){
+    if (!drag) return;
+    const dy = y - y0;
+    if (dy > 28) { if (ev) ev.preventDefault(); collapse(); drag = false; }
+    if (dy < -28) { expand(); drag = false; }
+  }
+  grab.addEventListener("touchstart", function(e){ onStart(e.touches[0].clientY); }, {passive:true});
+  grab.addEventListener("touchmove", function(e){ onMove(e.touches[0].clientY, e); }, {passive:false});
+  grab.addEventListener("touchend", function(){ drag = false; });
+  sheet.addEventListener("touchstart", function(e){
+    y0 = e.touches[0].clientY;
+  }, {passive:true});
+  sheet.addEventListener("touchmove", function(e){
+    if (isDesktop()) return;
+    const dy = e.touches[0].clientY - y0;
+    if (!sheet.classList.contains("collapsed") && sheet.scrollTop <= 0 && dy > 24) {
+      e.preventDefault();
+      collapse();
+    }
+  }, {passive:false});
+})();
 </script>
 </body>
 </html>
