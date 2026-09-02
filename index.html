@@ -113,7 +113,8 @@ try {
   <button class="on" data-layer="project">DC</button>
 </div>
 <div id="basemapChips">
-  <button class="on" data-base="map">Map</button>
+  <button class="on" data-base="simple">Simple</button>
+  <button data-base="map">Map</button>
   <button data-base="sat">Satellite</button>
   <button data-base="terrain">Terrain</button>
 </div>
@@ -151,6 +152,9 @@ const PROJECTS = [{"id":"clusterpower","name":"ClusterPower + AIC, Mischii / Cra
 
 const map = L.map("map", { zoomControl: true }).setView([45.6, 25.0], 6.4);
 const bases = {
+  simple: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri", maxZoom: 16
+  }),
   map: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap", maxZoom: 19
   }),
@@ -161,7 +165,7 @@ const bases = {
     attribution: "&copy; OpenStreetMap, SRTM | OpenTopoMap", maxZoom: 17
   })
 };
-let currentBase = bases.map.addTo(map);
+let currentBase = bases.simple.addTo(map);
 
 const layers = {
   elec: L.layerGroup().addTo(map),
@@ -243,7 +247,7 @@ function show(obj, kind) {
 
 ST400.forEach(s => {
   const m = L.marker([s.lat, s.lng], { icon: kvIcon(), zIndexOffset: 0 }).addTo(layers.elec);
-  m.on("click", () => { map.panTo(m.getLatLng()); show(s, "st"); });
+  m.on("click", () => { show(s, "st"); focusAt(m.getLatLng()); });
   m.bindTooltip(s.name, { direction:"top", offset:[0,-8] });
   byId[s.id] = m;
 });
@@ -275,14 +279,14 @@ GAS.forEach(g => {
 
 SOLAR.forEach(s => {
   const m = L.marker([s.lat, s.lng], { icon: sunIcon(s.stage), zIndexOffset: 200 }).addTo(layers.solar);
-  m.on("click", () => { map.panTo(m.getLatLng()); show(s, "solar"); });
+  m.on("click", () => { show(s, "solar"); focusAt(m.getLatLng()); });
   m.bindTooltip(`${s.name} (${s.mw} MW · ${s.stage})`, { direction:"top", offset:[0,-8] });
 });
 
 const colors = { live:"#1e7a3a", grid:"#b56a12", ann:"#b13228", eoi:"#666" };
 PROJECTS.forEach(p => {
   const m = L.marker([p.lat, p.lng], { icon: projIcon(colors[p.stage]), zIndexOffset: 500 }).addTo(layers.project);
-  m.on("click", () => { map.setView(m.getLatLng(), 10); show(p, "proj"); });
+  m.on("click", () => { show(p, "proj"); focusAt(m.getLatLng(), 10); });
   m.bindTooltip(p.name.split(",")[0], { direction:"top", offset:[0,-8] });
   byId[p.id] = m;
 });
@@ -302,15 +306,16 @@ function renderList(){
 renderList();
 window.focusSolar = function(i){
   const s = SOLAR[i];
-  map.setView([s.lat, s.lng], 10);
   show(s, "solar");
+  focusAt([s.lat, s.lng], 10);
 };
 
 window.focusProj = function(id) {
   const p = PROJECTS.find(x => x.id===id);
   const m = byId[id];
-  if (m) { map.setView(m.getLatLng(), 10); m.openTooltip(); }
+  if (m) m.openTooltip();
   show(p, "proj");
+  if (m) focusAt(m.getLatLng(), 10);
 };
 
 function setLayer(k, on){
@@ -340,9 +345,23 @@ document.querySelectorAll("#basemapChips button").forEach(b => {
   const grab = document.getElementById("grab");
   const bodyEl = sheet.querySelector(".sheet-body");
   function desktop(){ return window.matchMedia("(min-width: 900px)").matches; }
-  function size(){ setTimeout(function(){ try { map.invalidateSize(); } catch (x) {} }, 80); }
+  function size(){
+    const mapEl = document.getElementById("map");
+    if (desktop()) mapEl.style.bottom = "0px";
+    else mapEl.style.bottom = Math.round(sheet.getBoundingClientRect().height) + "px";
+    setTimeout(function(){ try { map.invalidateSize({animate:false}); } catch (x) {} }, 60);
+  }
   window.openSheet = function(){ sheet.classList.remove("peek"); size(); };
   window.closeSheet = function(){ if (!desktop()) { sheet.classList.add("peek"); size(); } };
+  window.focusAt = function(latlng, zoom){
+    window.openSheet();
+    setTimeout(function(){
+      if (zoom != null) map.setView(latlng, zoom, {animate:true});
+      else map.panTo(latlng, {animate:true});
+    }, 80);
+  };
+  window.addEventListener("resize", size);
+  size();
   grab.addEventListener("click", function(){
     if (sheet.classList.contains("peek")) window.openSheet(); else window.closeSheet();
   });
