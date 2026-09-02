@@ -52,14 +52,12 @@
   .item h2 { font-size:14px; margin:0 0 4px; }
   .meta { font-size:12px; color:var(--muted); }
   .tag { display:inline-block; font-size:10px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; padding:2px 6px; border-radius:4px; margin-right:4px; }
-  .t-live { background:#d9f2e3; color:#1e6b3a; }
-  .t-grid { background:#fde7c7; color:#8a4b00; }
-  .t-ann { background:#f3e2e0; color:#8a2b22; }
-  .t-eoi { background:#e8e8e8; color:#444; }
-  .t-plan { background:#d9e6f2; color:#1f4e79; }
   .t-st { background:#e7eef5; color:#1f4e79; }
   .t-gas { background:#f8e4d8; color:#8a3b12; }
   .t-sun { background:#f8ecd0; color:#8a6500; }
+  .t-dc { background:#f3e2e0; color:#8a2b22; }
+  .item.focus { border-color:#1a1a1a; }
+  .what { font-size:13px; margin:6px 0 8px; }
   a { color:var(--blue); }
   .sources { font-size:11px; margin-top:6px; }
   .sources a { display:block; margin:2px 0; }
@@ -181,68 +179,71 @@ function kvIcon() {
 function projIcon(color) {
   return L.divIcon({ className:"", html:`<div style="width:14px;height:14px;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px ${color}"></div>`, iconSize:[14,14], iconAnchor:[7,7] });
 }
-function sunIcon(stage) {
-  const c = stage === "planned" ? "#b56a12" : "#c99212";
-  const inner = stage === "planned"
-    ? `<div style="width:12px;height:12px;border-radius:50%;background:transparent;border:2px dashed ${c};box-shadow:0 0 0 1px #fff"></div>`
-    : `<div style="width:12px;height:12px;border-radius:50%;background:${c};border:2px solid #fff;box-shadow:0 0 0 1px ${c}"></div>`;
-  return L.divIcon({ className:"", html: inner, iconSize:[12,12], iconAnchor:[6,6] });
+function sunIcon() {
+  return L.divIcon({ className:"", html:"<div style='width:12px;height:12px;border-radius:50%;background:#c99212;border:2px solid #fff;box-shadow:0 0 0 1px #c99212'></div>", iconSize:[12,12], iconAnchor:[6,6] });
 }
 
 const stageClass = { live:"t-live", grid:"t-grid", ann:"t-ann", eoi:"t-eoi", planned:"t-plan" };
 
-function show(obj, kind) {
+function card(type, typeClass, name, what, extra) {
+  return `<div class="item focus"><span class="tag ${typeClass}">${type}</span>
+    <h2>${name}</h2>
+    <p class="what">${what}</p>
+    <div class="meta">${extra || ""}</div></div>`;
+}
+function reveal(html) {
   try { window.openSheet(); } catch (x) {}
   const el = document.getElementById("detail");
+  el.innerHTML = html;
+  const body = document.querySelector(".sheet-body");
+  if (body) body.scrollTop = 0;
+}
+
+function show(obj, kind) {
   if (kind === "st") {
-    el.innerHTML = `<div class="item"><span class="tag t-st">400 kV station</span>
-      <h2>${obj.name}</h2>
-      <div class="meta">${obj.region || ""}. Transelectrica 400 kV hub. Pin is the OSM switchyard, not a town centroid.
-      <div class="sources"><a href="https://www.transelectrica.ro/ro/web/tel/date-generale-management" target="_blank">Transelectrica: 38 stations at 400 kV</a></div></div></div>`;
+    reveal(card("Electricity", "t-st", obj.name,
+      "Transelectrica 400 kV station (stație electrică) — a junction on the RET (Rețeaua Electrică de Transport), not a power plant.",
+      `${obj.region || ""}. Pin is the OSM switchyard where mapped. Power arrives here on 400 kV lines from the rest of the SEN (Sistemul Energetic Național).`));
     return;
   }
   if (kind === "line") {
-    el.innerHTML = `<div class="item"><span class="tag t-plan">Planned 400 kV</span>
-      <h2>${obj.name}</h2><div class="meta">${obj.when}<div class="sources">${obj.src || ""}</div></div></div>`;
+    reveal(card("Electricity", "t-st", obj.name,
+      "Planned 400 kV line (not built). Drawn station-to-station, not the future tower path.",
+      obj.when || ""));
     return;
   }
   if (kind === "kvline") {
-    el.innerHTML = `<div class="item"><span class="tag t-st">Existing 400 kV</span>
-      <h2>${obj.n || "400 kV circuit"}</h2>
-      <div class="meta">OSM power=line voltage=400000. Geometry follows the mapped towers, not a straight town-to-town path.</div></div>`;
+    reveal(card("Electricity", "t-st", obj.n || "400 kV circuit",
+      "Existing 400 kV overhead line. This is the wire between stations.",
+      "Source: OpenStreetMap power=line voltage=400000 (tower trace, not Transelectrica GIS)."));
     return;
   }
   if (kind === "gas") {
-    const src = obj.s === "osm" ? "OpenStreetMap pipeline (pipe-accurate where mapped)" : "SciGRID_gas IGGIELGN — transmission topology, node-to-node (not the buried pipe trace)";
-    const extra = obj.d ? ` Diameter ~${Math.round(obj.d)} mm.` : "";
-    const km = obj.km ? ` Segment ${obj.km} km.` : "";
-    el.innerHTML = `<div class="item"><span class="tag t-gas">Gas SNT</span>
-      <h2>${obj.n || "Transgaz SNT"}</h2>
-      <div class="meta">High-pressure transmission (not Delgaz / Distrigaz Sud Rețele).${extra}${km}
-      <div class="sources">${src}</div></div></div>`;
+    const src = obj.s === "osm"
+      ? "OpenStreetMap: follows the mapped pipe where Transgaz is traced."
+      : "SciGRID_gas: schematic node-to-node, not the buried pipe. Can miss or skip a city even when SNT is there.";
+    const extra = (obj.d ? `Diameter ~${Math.round(obj.d)} mm. ` : "") + (obj.km ? `${obj.km} km segment. ` : "") + src;
+    reveal(card("Gas", "t-gas", obj.n || "Transgaz SNT",
+      "High-pressure SNT (Sistemul Național de Transport) — Transgaz trunk, not a town Delgaz / Distrigaz Sud Rețele pipe.",
+      extra));
     return;
   }
   if (kind === "solar") {
-    el.innerHTML = `<div class="item"><span class="tag ${obj.stage==="planned"?"t-plan":"t-live"}">${obj.stage==="planned"?"Planned":"Live"} · ${obj.mw} MW</span>
-      <h2>${obj.name}</h2>
-      <div class="meta">${obj.note || ""}
-      <div class="sources">${obj.src || ""}</div></div></div>`;
+    const st = obj.stage === "planned" ? "Planned (not generating yet)." : "Live park.";
+    reveal(card("Solar", "t-sun", obj.name,
+      `${st} Utility-scale photovoltaic, ${obj.mw} MW.`,
+      (obj.note || "") + (obj.src ? `<div class="sources">${obj.src}</div>` : "")));
     return;
   }
   const p = obj;
-  el.innerHTML = `<div class="item">
-    <span class="tag ${stageClass[p.stage]}">${p.stageLabel}</span>
-    <h2>${p.name}</h2>
-    <div class="meta">
-      <b>MW:</b> ${p.mw}<br/>
-      <b>Voltage:</b> ${p.kv}<br/>
-      <b>Land:</b> ${p.land}<br/>
-      <b>Grid / ATR:</b> ${p.atr}<br/>
-      <b>Use:</b> ${p.use}<br/>
-      <b>By 2030:</b> ${p.by2030}
-      <div class="sources">${p.sources.map(s=>`<a href="${s[1]}" target="_blank">${s[0]}</a>`).join("")}</div>
-    </div>
-  </div>`;
+  const links = (p.sources||[]).map(s=>`<a href="${s[1]}" target="_blank">${s[0]}</a>`).join("");
+  reveal(card("DC project", "t-dc", p.name,
+    "Announced or piloted data-center site — not a Transelectrica station.",
+    `<div>${p.stageLabel}</div>
+     <div>${p.mw}</div>
+     <div>${p.kv}</div>
+     <div>${p.atr}</div>
+     <div class="sources">${links}</div>`));
 }
 
 ST400.forEach(s => {
@@ -278,14 +279,13 @@ GAS.forEach(g => {
 });
 
 SOLAR.forEach(s => {
-  const m = L.marker([s.lat, s.lng], { icon: sunIcon(s.stage), zIndexOffset: 200 }).addTo(layers.solar);
+  const m = L.marker([s.lat, s.lng], { icon: sunIcon(), zIndexOffset: 200 }).addTo(layers.solar);
   m.on("click", () => { show(s, "solar"); focusAt(m.getLatLng()); });
   m.bindTooltip(`${s.name} (${s.mw} MW · ${s.stage})`, { direction:"top", offset:[0,-8] });
 });
 
-const colors = { live:"#1e7a3a", grid:"#b56a12", ann:"#b13228", eoi:"#666" };
 PROJECTS.forEach(p => {
-  const m = L.marker([p.lat, p.lng], { icon: projIcon(colors[p.stage]), zIndexOffset: 500 }).addTo(layers.project);
+  const m = L.marker([p.lat, p.lng], { icon: projIcon("#b13228"), zIndexOffset: 500 }).addTo(layers.project);
   m.on("click", () => { show(p, "proj"); focusAt(m.getLatLng(), 10); });
   m.bindTooltip(p.name.split(",")[0], { direction:"top", offset:[0,-8] });
   byId[p.id] = m;
@@ -294,10 +294,10 @@ PROJECTS.forEach(p => {
 const list = document.getElementById("list");
 function renderList(){
   const dc = PROJECTS.map(p =>
-    `<div class="item" onclick="focusProj('${p.id}')"><span class="tag ${stageClass[p.stage]}">${p.stageLabel}</span><h2>${p.name}</h2><div class="meta">${p.mw}</div></div>`
+    `<div class="item" onclick="focusProj('${p.id}')"><span class="tag t-dc">DC project</span><h2>${p.name}</h2><div class="meta">${p.mw} · ${p.stageLabel}</div></div>`
   ).join("");
   const sun = SOLAR.map((s,i) =>
-    `<div class="item" onclick="focusSolar(${i})"><span class="tag ${s.stage==="planned"?"t-plan":"t-live"}">${s.stage==="planned"?"Planned":"Live"} · ${s.mw} MW</span><h2>${s.name}</h2></div>`
+    `<div class="item" onclick="focusSolar(${i})"><span class="tag t-sun">Solar</span><h2>${s.name}</h2><div class="meta">${s.mw} MW · ${s.stage==="planned"?"planned":"live"}</div></div>`
   ).join("");
   list.innerHTML =
     "<div class='lbl'>DC projects</div>" + dc +
