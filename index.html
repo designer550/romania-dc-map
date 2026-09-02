@@ -17,6 +17,12 @@
   #floatLayers button.on[data-layer="gas"] { background:var(--gas); border-color:var(--gas); }
   #floatLayers button.on[data-layer="solar"] { background:var(--sun); border-color:var(--sun); }
   #floatLayers button.on[data-layer="project"] { background:var(--red); border-color:var(--red); }
+  #basemapChips { position:fixed; top:max(10px, env(safe-area-inset-top)); right:10px; z-index:450; display:flex; flex-direction:column; gap:6px; }
+  #basemapChips button { font-size:12px; border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 11px; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  #basemapChips button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  @media (min-width: 900px) {
+    #basemapChips { right:390px; }
+  }
   #sheet { position:fixed; left:0; right:0; bottom:0; height:auto; max-height:min(72dvh, 640px); background:var(--card); border-top:1px solid var(--line); border-radius:14px 14px 0 0; z-index:500; display:flex; flex-direction:column; overflow:hidden; }
   #sheet.peek { height:calc(52px + env(safe-area-inset-bottom, 0px)); max-height:calc(52px + env(safe-area-inset-bottom, 0px)); }
   .grab { flex:0 0 52px; padding:10px 16px 8px; }
@@ -106,6 +112,11 @@ try {
   <button class="on" data-layer="solar">Solar</button>
   <button class="on" data-layer="project">DC</button>
 </div>
+<div id="basemapChips">
+  <button class="on" data-base="map">Map</button>
+  <button data-base="sat">Satellite</button>
+  <button data-base="terrain">Terrain</button>
+</div>
 <div id="sheet" class="peek">
   <div class="grab" id="grab"><div class="handle"></div><div class="peek">Details — tap or pull up</div></div>
   <div class="sheet-body">
@@ -139,10 +150,18 @@ const SOLAR = [{"name":"Dama Solar (Pilu–Grăniceri)","lat":46.42,"lng":21.33,
 const PROJECTS = [{"id":"clusterpower","name":"ClusterPower + AIC, Mischii / Craiova","lat":44.365,"lng":23.86,"kv":"Own substation + 400 kV Oltenia area (Urechești / Țânțăreni nearby)","mw":"10 MW live; 70 MW targeted end-2026; announced path ~512 MW Mischii + 300 MW Făurești ≈ 800 MW","stage":"live","stageLabel":"Live (10 MW) + phased announcement","land":"Original Mischii plot 2.54 ha (2021). Expansion land not published.","atr":"Not a public Transelectrica ATR number. ClusterPower contributed land + power + owned substation + on-site gen. AIC does capital.","use":"Pitched as AI region, Nvidia-certified.","by2030":"Most plausible large live addition if phases hold. 800 MW by 2030 is announced, not proven.","sources":[["DCD 19 Dec 2025","https://www.datacenterdynamics.com/"]]},{"id":"wdp","name":"WDP / Lamas, Ștefăneștii de Jos (Ilfov)","lat":44.53,"lng":26.2,"kv":"220 kV discussed (new station). Not 400 kV.","mw":"380 MW combined grid connection approved. IT MW not disclosed.","stage":"grid","stageLabel":"Grid connection approved — project not committed","land":"Not published.","atr":"Grid connection approved (press). WDP told DCD it is too early to call it a project.","use":"Unspecified. Near Bucharest = more cloud/inference-shaped than Valea Jiului.","by2030":"380 MW live by 2030 is unlikely. Treat as a claimed pipe, not a campus.","sources":[["Profit.ro / DCD 28 Aug 2026","https://www.datacenterdynamics.com/"],["BeBeez 28 Aug 2026","https://bebeez.it/"]]},{"id":"sany","name":"Sany + Danube Solar, Timișoara / Uivar","lat":45.7,"lng":21.15,"kv":"Not published as 400 vs 220.","mw":"70 MW DC (MoU). Package also cites solar + batteries.","stage":"ann","stageLabel":"MoU / announcement","land":"MoU. Building permit / ATR not shown in the coverage we used.","atr":"Unknown.","use":"DC + solar + storage package.","by2030":"70 MW possible if it is real. Not evidenced as financed.","sources":[["DCD Mar 2026","https://www.datacenterdynamics.com/"],["Profit.ro / Romania Insider Mar 2026","https://www.romania-insider.com/"]]},{"id":"driverai","name":"DriverAI, Luna (Cluj)","lat":46.5,"lng":23.78,"kv":"E-INFRA power cited in press. Voltage not confirmed.","mw":"80 MW announced (4×20). $1bn first-stage claim unverified.","stage":"ann","stageLabel":"Announcement — credibility questioned","land":"Leviatan park cited. Not independently confirmed here.","atr":"Unknown.","use":"AI pitch. DCD questioned credibility.","by2030":"Do not count until land + grid are public.","sources":[["DCD 2026","https://www.datacenterdynamics.com/"]]},{"id":"monsson","name":"Monsson, Mireasa (Constanța)","lat":44.4909,"lng":28.3246,"kv":"Existing hybrid connection (~50 MW wind/solar/BESS). Not shown as a new 400 kV ATR.","mw":"50 MW DC pilot. Ambition 50–200 MW / site, 7 sites.","stage":"ann","stageLabel":"Design / permitting on existing hybrid connection","land":"Pilot on existing energy site.","atr":"Using an existing hybrid connection, not a new 100 MW consumption ATR.","use":"DC next to own generation.","by2030":"50 MW pilot is the only concrete figure.","sources":[["Energy World 24 Feb 2026","https://www.energyworld.ro/"]]},{"id":"giga","name":"Black Sea AI Gigafactory (state EoI)","lat":44.38,"lng":28.07,"kv":"Cernavodă nuclear / Doicești SMR corridor. 400 kV area.","mw":"Up to 1.5 GW proposed. Not awarded.","stage":"eoi","stageLabel":"Expression of interest — not a plant","land":"Site not locked. Ministry: private-led consultation, not the EuroHPC bid itself.","atr":"None. EoI only.","use":"Sovereign AI / EuroHPC-adjacent. Bids for EU AI Gigafactories due 12 Nov 2026.","by2030":"Do not put in a 2030 live-MW total.","sources":[["SeeNews 25 Jun 2025","https://seenews.com/"],["energie.gov.ro EoI 2026","https://energie.gov.ro/"],["EuroHPC call 30 Jul 2026, deadline 12 Nov 2026","https://eurohpc-ju.europa.eu/"]]}];
 
 const map = L.map("map", { zoomControl: true }).setView([45.6, 25.0], 6.4);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap · power OSM · gas SciGRID/OSM",
-  maxZoom: 19
-}).addTo(map);
+const bases = {
+  map: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap", maxZoom: 19
+  }),
+  sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    attribution: "Tiles &copy; Esri", maxZoom: 19
+  }),
+  terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap, SRTM | OpenTopoMap", maxZoom: 17
+  })
+};
+let currentBase = bases.map.addTo(map);
 
 const layers = {
   elec: L.layerGroup().addTo(map),
@@ -303,6 +322,16 @@ document.querySelectorAll("#layerToggles button, #floatLayers button").forEach(b
     const k = b.dataset.layer;
     const on = !layers[k] || !map.hasLayer(layers[k]);
     setLayer(k, on);
+  };
+});
+document.querySelectorAll("#basemapChips button").forEach(b => {
+  b.onclick = () => {
+    const k = b.dataset.base;
+    if (!bases[k] || currentBase === bases[k]) return;
+    map.removeLayer(currentBase);
+    currentBase = bases[k].addTo(map);
+    currentBase.bringToBack();
+    document.querySelectorAll("#basemapChips button").forEach(x => x.classList.toggle("on", x===b));
   };
 });
 
